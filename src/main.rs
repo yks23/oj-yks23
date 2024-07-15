@@ -1,13 +1,14 @@
-use actix_web::{get, middleware::Logger, post, web, App, HttpServer, Responder};
+use crate::api::{contests, jobs, users};
+use crate::config::Config;
+use crate::models::{User, USER_LIST};
+use actix_web::{web, App, HttpServer,Responder};
+use clap::parser::ValueSource;
+mod api;
+mod arg_process;
+mod config;
+mod models;
 use env_logger;
 use log;
-
-#[get("/hello/{name}")]
-async fn greet(name: web::Path<String>) -> impl Responder {
-    log::info!(target: "greet_handler", "Greeting {}", name);
-    format!("Hello {name}!")
-}
-
 // DO NOT REMOVE: used in automatic testing
 #[post("/internal/exit")]
 #[allow(unreachable_code)]
@@ -16,20 +17,36 @@ async fn exit() -> impl Responder {
     std::process::exit(0);
     format!("Exited")
 }
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    HttpServer::new(|| {
+    let matched = arg_process::read_command();
+    if matched.value_source("config").unwrap() == ValueSource::DefaultValue {
+        eprintln!("Usage: -c [path_to_config.json]");
+        std::process::exit(1);
+    }
+    let config = Config::from_file(matched.get_one::<String>("config").unwrap().as_str());
+    let config_data = web::Data::new(config);
+    // Initialize default root user
+    let root_user = User {
+        id: Some(0),
+        name: "root".to_string(),
+    };
+    {
+        let mut users = USER_LIST.lock().unwrap();
+        users.push(root_user);
+    }
+    let copy_config = config_data.clone();
+    HttpServer::new(move || {
         App::new()
-            .wrap(Logger::default())
-            .route("/hello", web::get().to(|| async { "Hello World!" }))
-            .service(greet)
-            // DO NOT REMOVE: used in automatic testing
-            .service(exit)
+            .app_data(config_data.clone())
+            .configure(jobs::init_routes)
+            .configure(users::init_routes)
+            .configure(contests::init_routes)
+            .service(exit())
     })
-    .bind(("127.0.0.1", 12345))?
+    .bind(("127.0.0.1", copy_config.port))?
     .run()
     .await
 }
