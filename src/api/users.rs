@@ -3,6 +3,7 @@ use actix_web::{web, HttpResponse};
 use std::sync::{Arc, Mutex};
 
 async fn get_users() -> HttpResponse {
+    log::info!("Provide users as requested.");
     let users = USER_LIST.lock().unwrap();
     HttpResponse::Ok().json(&*users)
 }
@@ -28,7 +29,8 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
             0
         };
         user.id = Some(new_id);
-        users.push(user);
+        users.push(user.clone());
+        log::info!("{}", format!("Successfully create new user {} !!",user.name));
     } else {
         let mut flag: bool = false;
         for his_user in users.iter_mut() {
@@ -53,6 +55,7 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
                 format!("User {} not found.", user.id.unwrap()),
             ));
         }
+        log::info!("Successfully change user {} 's name to {}",user.id.unwrap(),user.name);
     }
     HttpResponse::Ok().json(users.last().unwrap())
 }

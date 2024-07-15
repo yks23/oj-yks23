@@ -2,20 +2,18 @@ use actix_web::{web, HttpResponse};
 use std::process::{Command, Stdio};
 use wait_timeout::ChildExt;
 use std::time::Duration;
-use crate::models::{HTTPerror, Job, JOB_LIST, USER_LIST};
+use crate::models::{HTTPerror, Job, JOB_LIST, LANGUAGE_CONFIG, USER_LIST};
 use crate::config::Config;
 use std::fs::File;
 use std::io::{Read, Write};
 async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpResponse {
     let mut job = new_job.into_inner();
-    let compile_cmd = &config.languages[&job.language].compile;
-    let run_cmd = &config.languages[&job.language].run;
     let temp_file_path = "temp_code.rs";//change then
     let exe_path="temp_code";
     let users=USER_LIST.lock().unwrap();
     {//handle language
     let mut flag1:bool=false;
-    for i in config.languages.keys(){
+    for i in LANGUAGE_CONFIG.keys(){
         if *i==job.language{
             flag1=true;
         }
@@ -31,6 +29,7 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
         return HttpResponse::NotFound().json(HTTPerror::new_none(3, "ERR_NOT_FOUND".to_string()));
     }
     }
+        let compile_cmd = &LANGUAGE_CONFIG.get((job.language.as_str())).unwrap();
     // 将代码写入临时文件
     let mut file = File::create(temp_file_path).expect("Failed to create temp file");
     file.write_all(job.source_code.as_bytes()).expect("Failed to write to temp file");
@@ -52,7 +51,7 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
         .spawn()
         .expect("Failed to run");
 
-    let timeout = Duration::from_millis(config.timeout);
+    let timeout = Duration::from_millis(500);
     let status_code = match child.wait_timeout(timeout).unwrap() {
         Some(status) => status.code().unwrap_or(-1),
         None => {

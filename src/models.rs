@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Job {
@@ -18,11 +19,11 @@ pub struct HTTPerror {
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PointState {
-     id:u64,
-      result:String,
-      time: u64,
-      memory: u64,
-      info: String,
+    id: u64,
+    result: String,
+    time: u64,
+    memory: u64,
+    info: String,
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JobState {
@@ -70,17 +71,22 @@ impl fmt::Display for User {
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Contest {
-     
-  id: Option<u64>,
-  name: String,
-  from: String,
-  to: String,
-  problem_ids:Vec<u64>,
-  user_ids: Vec<u64>,
-  submission_limit: u64,
-
+    id: Option<u64>,
+    name: String,
+    from: String,
+    to: String,
+    problem_ids: Vec<u64>,
+    user_ids: Vec<u64>,
+    submission_limit: u64,
 }
 lazy_static! {
     pub static ref JOB_LIST: Arc<Mutex<Vec<Job>>> = Arc::new(Mutex::new(Vec::new()));
     pub static ref USER_LIST: Arc<Mutex<Vec<User>>> = Arc::new(Mutex::new(Vec::new()));
+    pub static ref LANGUAGE_CONFIG: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert("rust", "rustc");
+        m.insert("c", "gcc");
+        m.insert("c++", "g++");
+        m
+    };
 }

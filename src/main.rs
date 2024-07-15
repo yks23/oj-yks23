@@ -1,7 +1,7 @@
 use crate::api::{contests, jobs, users};
 use crate::config::Config;
 use crate::models::{User, USER_LIST};
-use actix_web::{web, App, HttpServer,Responder};
+use actix_web::{web, App, HttpServer,Responder,post};
 use clap::parser::ValueSource;
 mod api;
 mod arg_process;
@@ -44,9 +44,9 @@ async fn main() -> std::io::Result<()> {
             .configure(jobs::init_routes)
             .configure(users::init_routes)
             .configure(contests::init_routes)
-            .service(exit())
+            .service(exit)
     })
-    .bind(("127.0.0.1", copy_config.port))?
+    .bind((copy_config.server.bind_address.clone(), copy_config.server.bind_port))?
     .run()
     .await
 }
