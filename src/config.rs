@@ -12,13 +12,21 @@ pub struct LanguageConfig {
     pub file_name: String,
     pub command:Vec<String>,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize,Clone)]
 pub struct Case {
-   score:u64,
-   input_file:String,
-   answer_file:String,
-   time_limit:u64,
-   memory_limit:u64,
+   pub score:f64,
+   pub input_file:String,
+   pub answer_file:String,
+   pub time_limit:u64,
+   pub memory_limit:u64,
+}
+impl  Case {
+    pub fn to_new(&self)->Case{
+        Case{score:self.score,input_file:self.input_file.clone(),answer_file:self.answer_file.clone(),time_limit:self.time_limit,memory_limit:self.memory_limit}
+    }
+    pub fn new()->Case{
+        Case{score:0.0,input_file:"".to_string(),answer_file:"".to_string(),time_limit:0,memory_limit:0}
+    }
 }
 #[derive(Deserialize)]
 pub struct Problem {

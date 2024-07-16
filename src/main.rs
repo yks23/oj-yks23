@@ -38,6 +38,10 @@ async fn main() -> std::io::Result<()> {
         users.push(root_user);
     }
     let copy_config = config_data.clone();
+    tokio::spawn(async move {
+        jobs::process_tasks(copy_config).await;
+    });
+    let copy_config = config_data.clone();
     HttpServer::new(move || {
         App::new()
             .app_data(config_data.clone())
