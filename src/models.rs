@@ -49,7 +49,7 @@ impl JobResponse {
             score: {
                 let mut sc: f64 = 0.0;
                 for (c, p) in &jbs.cases {
-                    if p.info == "Success" {
+                    if p.result == "Accepted" {
                         sc += c.score;
                     }
                 }
@@ -86,6 +86,7 @@ impl PointState {
 }
 pub struct JobState {
     pub id: u64,
+    pub problem_id:usize,
     pub created_time: String,
     pub updated_time: String,
     pub submission: Job,
@@ -99,6 +100,7 @@ impl JobState {
     pub fn new() -> JobState {
         JobState {
             id: 0,
+            problem_id:0,
             created_time: "".to_string(),
             updated_time: "".to_string(),
             submission: Job::new(),
@@ -108,6 +110,21 @@ impl JobState {
             cases: Vec::new(),
             sd: None,
         }
+    }
+    pub fn clone_d(&mut self)->JobState{
+        let mut rt=JobState{
+            id: self.id,
+            problem_id:self.problem_id,
+            created_time: self.created_time.clone(),
+            updated_time: self.updated_time.clone(),
+            submission: self.submission.clone(),
+            state: self.state.clone(),
+            result: self.result.clone(),
+            score:self.score,
+            cases: self.cases.clone(),
+            sd: None,
+        };
+        rt
     }
 }
 impl HTTPerror {
@@ -164,3 +181,16 @@ lazy_static! {
         m
     };
 }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct JobFilter {
+    pub user_id: Option<u64>,
+    pub user_name: Option<String>,
+    pub contest_id:Option<u64>,
+    pub problem_id:Option<u64>,
+    pub language:Option<String>,
+    pub from:Option<String>,
+    pub to :Option<String>,
+    pub state:Option<String>,
+    pub result:Option<String>,
+}
+

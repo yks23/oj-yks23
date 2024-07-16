@@ -1096,6 +1096,8 @@ dependencies = [
  "env_logger",
  "lazy_static",
  "log",
+ "openssl",
+ "openssl-sys",
  "pretty_assertions",
  "reqwest",
  "serde",

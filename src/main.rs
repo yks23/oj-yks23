@@ -7,6 +7,7 @@ mod api;
 mod arg_process;
 mod config;
 mod models;
+use clap::Command;
 use env_logger;
 use log;
 // DO NOT REMOVE: used in automatic testing
@@ -14,6 +15,7 @@ use log;
 #[allow(unreachable_code)]
 async fn exit() -> impl Responder {
     log::info!("Shutdown as requested");
+    let _=std::process::Command::new("rm").arg("main*");
     std::process::exit(0);
     format!("Exited")
 }
