@@ -31,6 +31,7 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
         user.id = Some(new_id);
         users.push(user.clone());
         log::info!("{}", format!("Successfully create new user {} !!",user.name));
+        return HttpResponse::Ok().json(users.last().unwrap());
     } else {
         let mut flag: bool = false;
         for his_user in users.iter_mut() {
@@ -44,8 +45,10 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
         }
         for his_user in users.iter_mut() {
             if &his_user.id.unwrap() == &user.id.unwrap() {
+                log::info!("Successfully change user {} 's name to {}",user.id.unwrap(),user.name);
                 flag = true;
                 his_user.name = user.name.clone();
+                return HttpResponse::Ok().json(his_user);
             }
         }
         if !flag {
@@ -55,9 +58,9 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
                 format!("User {} not found.", user.id.unwrap()),
             ));
         }
-        log::info!("Successfully change user {} 's name to {}",user.id.unwrap(),user.name);
     }
     HttpResponse::Ok().json(users.last().unwrap())
+    
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {

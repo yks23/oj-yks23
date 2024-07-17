@@ -298,7 +298,6 @@ impl TestCase {
             } else {
                 request = request.json(&c.request.content);
             }
-
             let (mut resp, mut http_file) = self
                 .log_and_send(request)
                 .expect(format!("case {} incorrect: HTTP request failed", self.name).as_str());

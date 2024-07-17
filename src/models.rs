@@ -162,24 +162,18 @@ impl fmt::Display for User {
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Contest {
-    id: Option<u64>,
-    name: String,
-    from: String,
-    to: String,
-    problem_ids: Vec<u64>,
-    user_ids: Vec<u64>,
-    submission_limit: u64,
+    pub id: Option<u64>,
+    pub name: String,
+    pub from: String,
+    pub to: String,
+    pub problem_ids: Vec<u64>,
+    pub user_ids: Vec<u64>,
+    pub submission_limit: u64,
 }
 lazy_static! {
     pub static ref JOB_LIST: Arc<Mutex<Vec<JobState>>> = Arc::new(Mutex::new(Vec::new()));
     pub static ref USER_LIST: Arc<Mutex<Vec<User>>> = Arc::new(Mutex::new(Vec::new()));
-    pub static ref LANGUAGE_CONFIG: HashMap<&'static str, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert("rust", "rustc");
-        m.insert("c", "gcc");
-        m.insert("c++", "g++");
-        m
-    };
+    pub static ref CONTEST_LIST: Arc<Mutex<Vec<Contest>>> = Arc::new(Mutex::new(Vec::new()));
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JobFilter {
