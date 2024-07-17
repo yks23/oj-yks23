@@ -1,4 +1,4 @@
-use crate::models::{HTTPerror, User, USER_LIST};
+use crate::models::{HTTPerror, User, USER_LIST,CONTEST_LIST};
 use actix_web::{web, HttpResponse};
 use std::sync::{Arc, Mutex};
 
@@ -31,6 +31,10 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
         user.id = Some(new_id);
         users.push(user.clone());
         log::info!("{}", format!("Successfully create new user {} !!",user.name));
+        {
+            let mut contests=CONTEST_LIST.lock().unwrap();
+            contests[0].user_ids.push(new_id);
+        }
         return HttpResponse::Ok().json(users.last().unwrap());
     } else {
         let mut flag: bool = false;

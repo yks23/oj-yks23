@@ -317,7 +317,7 @@ async fn put_job_by_id(config: web::Data<Config>, id: web::Path<u64>) -> HttpRes
 
         for job in jobs.iter_mut() {
             if job.id == *id {
-                if job.result!="Finished"{
+                if job.state!="Finished"{
                     return HttpResponse::BadRequest().json(HTTPerror::new(2,"ERR_INVALID_STATE".to_string(),format!("Job {} not finished",job.id)));
                 }
                 job.result = "Waiting".to_string();

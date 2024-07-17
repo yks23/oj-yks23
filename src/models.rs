@@ -187,4 +187,22 @@ pub struct JobFilter {
     pub state:Option<String>,
     pub result:Option<String>,
 }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ContestConfig {
+    pub scoring_rule: Option<String>,
+    pub tie_breaker: Option<String>,
+
+}
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UserRank {
+    pub user:User,
+    pub rank:u64,
+    pub scores:Vec<f64>,
+}
+
+impl UserRank{
+    pub fn new()->UserRank{
+        UserRank{user:User{name:"".to_string(),id:None},rank:0,scores:Vec::new()}
+    }
+}
 

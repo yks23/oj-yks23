@@ -1,7 +1,8 @@
 use crate::api::{contests, jobs, users};
 use crate::config::Config;
-use crate::models::{User, USER_LIST};
+use crate::models::{User, USER_LIST,CONTEST_LIST};
 use actix_web::{web, App, HttpServer,Responder,post};
+use actix_cors::Cors;
 use clap::parser::ValueSource;
 mod api;
 mod arg_process;
@@ -10,6 +11,7 @@ mod models;
 use clap::Command;
 use env_logger;
 use log;
+use models::Contest;
 // DO NOT REMOVE: used in automatic testing
 #[post("/internal/exit")]
 #[allow(unreachable_code)]
@@ -38,6 +40,12 @@ async fn main() -> std::io::Result<()> {
     {
         let mut users = USER_LIST.lock().unwrap();
         users.push(root_user);
+        let mut contests=CONTEST_LIST.lock().unwrap();
+        let mut problem_vec:Vec<u64>=Vec::new();
+        for i in config_data.clone().problems.iter(){
+            problem_vec.push(i.id);
+        }
+        contests.push(Contest{user_ids:vec![0],problem_ids:problem_vec,id:Some(0),name:"Global Contest".to_string(),from:"".to_string(),to:"".to_string(),submission_limit:10000});
     }
     let copy_config = config_data.clone();
     tokio::spawn(async move {
@@ -47,6 +55,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(config_data.clone())
+            .wrap(Cors::default().allow_any_origin().allow_any_method().allow_any_header())
             .configure(jobs::init_routes)
             .configure(users::init_routes)
             .configure(contests::init_routes)

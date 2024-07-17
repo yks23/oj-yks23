@@ -17,6 +17,7 @@ chrono="0.4"
 lazy_static = "1.4"
 openssl = "0.10"
 openssl-sys = "0.9"
+actix-cors="0.7.0"
 clap = { version = "4.0", features = ["derive"] }
 [dev-dependencies]
 assert-json-diff = "2.0.2"
