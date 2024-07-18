@@ -84,6 +84,7 @@ impl PointState {
         }
     }
 }
+#[derive(Serialize,Deserialize, Clone,Debug)]
 pub struct JobState {
     pub id: u64,
     pub problem_id:usize,
@@ -94,7 +95,6 @@ pub struct JobState {
     pub result: String,
     pub score: f64,
     pub cases: Vec<(Case, PointState)>,
-    pub sd: Option<oneshot::Sender<JobResponse>>,
 }
 impl JobState {
     pub fn new() -> JobState {
@@ -108,23 +108,7 @@ impl JobState {
             result: "".to_string(),
             score: 0.0,
             cases: Vec::new(),
-            sd: None,
         }
-    }
-    pub fn clone_d(&mut self)->JobState{
-        let mut rt=JobState{
-            id: self.id,
-            problem_id:self.problem_id,
-            created_time: self.created_time.clone(),
-            updated_time: self.updated_time.clone(),
-            submission: self.submission.clone(),
-            state: self.state.clone(),
-            result: self.result.clone(),
-            score:self.score,
-            cases: self.cases.clone(),
-            sd: None,
-        };
-        rt
     }
 }
 impl HTTPerror {
@@ -149,17 +133,6 @@ pub struct User {
     pub name: String,
 }
 
-impl fmt::Display for User {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "MyStruct {{ id: {}, name: {} }}",
-            self.id.unwrap(),
-            self.name
-        )?;
-        Ok(())
-    }
-}
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Contest {
     pub id: Option<u64>,

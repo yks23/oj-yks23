@@ -11,7 +11,7 @@
       "misc": {},
       "cases": [
         {
-          "time_limit": 2000000,
+          "time_limit": 200000000,
           "memory_limit": 0,
           "score": 100,
           "input_file": "./tests/data/hello_world/1.in",

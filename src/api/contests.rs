@@ -3,6 +3,7 @@ use crate::models::{
     Contest, ContestConfig, HTTPerror, JobResponse, User, UserRank, CONTEST_LIST, JOB_LIST,
     USER_LIST,
 };
+use crate::save_contests;
 use actix_web::{web, HttpResponse};
 use std::cmp::Ordering;
 use std::collections::HashSet;
@@ -130,7 +131,12 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
             ));
         }
     }
-    HttpResponse::Ok().json(contests.last().unwrap())
+    let nt = contests.last().unwrap().clone();
+    drop(contests);
+    {
+        save_contests().unwrap();
+    }
+    HttpResponse::Ok().json(nt)
 }
 fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> Ordering {
     let mut score1: f64 = 0.0;
@@ -144,7 +150,9 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
     {
         let jblist = JOB_LIST.lock().unwrap();
         for jb in jblist.iter() {
-            joblist.push(JobResponse::from_Jobstate(jb));
+            if jb.submission.contest_id == contest.id.unwrap() as i32 {
+                joblist.push(JobResponse::from_Jobstate(jb));
+            }
         }
     }
     if cf.scoring_rule.is_some() {
@@ -272,10 +280,10 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
                 if latest1 < latest2 {
                     return Ordering::Greater;
                 }
-                if latest1 >latest2{
+                if latest1 > latest2 {
                     return Ordering::Less;
                 }
-                if latest1==latest2{
+                if latest1 == latest2 {
                     return Ordering::Equal;
                 }
             }
@@ -305,8 +313,7 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
     }
     Ordering::Equal
 }
-fn get_score_list(cf: &ContestConfig, a: &User,contest: &Contest)->Vec<f64>{
-
+fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
     let mut scores: Vec<f64> = Vec::new();
 
     let mut joblist = Vec::new();
@@ -365,10 +372,27 @@ fn get_score_list(cf: &ContestConfig, a: &User,contest: &Contest)->Vec<f64>{
 }
 async fn get_ranklist(id: web::Path<u64>, contestcfg: web::Query<ContestConfig>) -> HttpResponse {
     let mut ranklist: Vec<_> = Vec::new();
-    let contest;
+    let mut contest: Contest;
     {
         let users = USER_LIST.lock().unwrap();
-        contest = CONTEST_LIST.lock().unwrap().last().unwrap().clone();
+        let mut flag: bool = false;
+        let contests = CONTEST_LIST.lock().unwrap();
+        contest = contests.last().unwrap().clone();
+        for i in contests.iter() {
+            if i.id.unwrap() == *id {
+                contest = i.clone();
+                flag = true;
+                break;
+            }
+        }
+
+        if !flag {
+            return HttpResponse::NotFound().json(HTTPerror::new(
+                3,
+                "ERR_NOT_FOUND".to_string(),
+                format!("Contest {} not found.", id),
+            ));
+        }
         for k in contest.user_ids.iter() {
             for us in users.iter() {
                 if us.id.unwrap() == *k {
@@ -388,13 +412,14 @@ async fn get_ranklist(id: web::Path<u64>, contestcfg: web::Query<ContestConfig>)
                 ur.rank += 1;
             }
         }
-        ur.scores=get_score_list(&contestcfg, us, &contest);
+        ur.scores = get_score_list(&contestcfg, us, &contest);
         final_rank.push(ur.clone());
     }
     HttpResponse::Ok().json(final_rank)
 }
 async fn get_contest() -> HttpResponse {
-    let vc: Vec<Contest> = CONTEST_LIST.lock().unwrap().to_vec();
+    let mut vc: Vec<Contest> = CONTEST_LIST.lock().unwrap().to_vec();
+    vc.remove(0);
     HttpResponse::Ok().json(vc)
 }
 async fn get_contest_by_id(id: web::Path<u64>) -> HttpResponse {

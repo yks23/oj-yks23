@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, net::Ipv4Addr};
 use serde_json;
 #[derive(Deserialize)]
@@ -12,7 +12,7 @@ pub struct LanguageConfig {
     pub file_name: String,
     pub command:Vec<String>,
 }
-#[derive(Deserialize,Clone)]
+#[derive(Serialize,Deserialize,Clone,Debug)]
 pub struct Case {
    pub score:f64,
    pub input_file:String,

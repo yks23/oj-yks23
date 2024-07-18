@@ -1,7 +1,7 @@
-use crate::models::{HTTPerror, User, USER_LIST,CONTEST_LIST};
+use crate::models::{HTTPerror, User, CONTEST_LIST, USER_LIST};
+use crate::{save_contests, save_users};
 use actix_web::{web, HttpResponse};
 use std::sync::{Arc, Mutex};
-
 async fn get_users() -> HttpResponse {
     log::info!("Provide users as requested.");
     let users = USER_LIST.lock().unwrap();
@@ -30,9 +30,12 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
         };
         user.id = Some(new_id);
         users.push(user.clone());
-        log::info!("{}", format!("Successfully create new user {} !!",user.name));
+        log::info!(
+            "{}",
+            format!("Successfully create new user {} !!", user.name)
+        );
         {
-            let mut contests=CONTEST_LIST.lock().unwrap();
+            let mut contests = CONTEST_LIST.lock().unwrap();
             contests[0].user_ids.push(new_id);
         }
         return HttpResponse::Ok().json(users.last().unwrap());
@@ -49,7 +52,11 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
         }
         for his_user in users.iter_mut() {
             if &his_user.id.unwrap() == &user.id.unwrap() {
-                log::info!("Successfully change user {} 's name to {}",user.id.unwrap(),user.name);
+                log::info!(
+                    "Successfully change user {} 's name to {}",
+                    user.id.unwrap(),
+                    user.name
+                );
                 flag = true;
                 his_user.name = user.name.clone();
                 return HttpResponse::Ok().json(his_user);
@@ -63,8 +70,13 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
             ));
         }
     }
-    HttpResponse::Ok().json(users.last().unwrap())
-    
+    let us = users.last().unwrap().clone();
+    drop(users);
+    {
+        save_users().unwrap();
+        save_contests().unwrap();
+    }
+    HttpResponse::Ok().json(us)
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {

@@ -1,8 +1,9 @@
+use crate::api::contests;
 use crate::config::{Case, Config};
 use crate::models::{
-    HTTPerror, Job, JobFilter, JobResponse, JobState, PointState, JOB_LIST,
-    USER_LIST,
+    HTTPerror, Job, JobFilter, JobResponse, JobState, PointState, CONTEST_LIST, JOB_LIST, USER_LIST,
 };
+use crate::save_jobs;
 use actix_web::{web, HttpResponse};
 use chrono::DateTime;
 use chrono::Utc;
@@ -13,7 +14,6 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use std::time::Instant;
 use tokio::sync::oneshot;
-
 use wait_timeout::ChildExt;
 fn loose_compare(output: &str, expected: &str) -> bool {
     let output_lines: Vec<&str> = output.lines().map(|line| line.trim_end()).collect();
@@ -27,82 +27,114 @@ fn strict_compare(output: &str, expected: &str) -> bool {
 }
 async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpResponse {
     log::info!("Enter post_job.own joblist");
+    let job = new_job.into_inner();
 
-    let (r, w) = oneshot::channel();
-    {
-        let mut job = new_job.into_inner();
-
-        let mut jobs = JOB_LIST.lock().unwrap();
-        let users = USER_LIST.lock().unwrap();
-        let now = Utc::now();
-        let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
-        let mut jobstats = JobState::new();
-        jobstats.created_time = created_time.clone();
-        jobstats.updated_time = created_time;
-        jobstats.problem_id = job.problem_id as usize;
-        jobstats.id = match jobs.last() {
-            None => 0,
-            Some(job) => job.id + 1,
-        };
-        jobstats.submission = job.clone();
-        jobstats.score = 0.0;
-        for p in &config.problems {
-            if p.id as i32 == job.problem_id {
-                jobstats.cases = p
-                    .cases
-                    .iter()
-                    .enumerate()
-                    .map(|(i, c)| {
-                        (
-                            c.to_new(),
-                            PointState::new(
-                                i as u64 + 1,
-                                "Waiting".to_string(),
-                                0,
-                                0,
-                                "".to_string(),
-                            ),
-                        )
-                    })
-                    .collect();
-                jobstats.cases.insert(
-                    0,
+    let mut jobs = JOB_LIST.lock().unwrap();
+    let users = USER_LIST.lock().unwrap();
+    let now = Utc::now();
+    let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+    let mut jobstats = JobState::new();
+    jobstats.created_time = created_time.clone();
+    jobstats.updated_time = created_time.clone();
+    jobstats.problem_id = job.problem_id as usize;
+    jobstats.id = match jobs.last() {
+        None => 0,
+        Some(job) => job.id + 1,
+    };
+    jobstats.submission = job.clone();
+    jobstats.score = 0.0;
+    for p in &config.problems {
+        if p.id as i32 == job.problem_id {
+            jobstats.cases = p
+                .cases
+                .iter()
+                .enumerate()
+                .map(|(i, c)| {
                     (
-                        Case::new(),
-                        PointState::new(0, "Waiting".to_string(), 0, 0, "".to_string()),
-                    ),
-                );
-            }
+                        c.to_new(),
+                        PointState::new(i as u64 + 1, "Waiting".to_string(), 0, 0, "".to_string()),
+                    )
+                })
+                .collect();
+            jobstats.cases.insert(
+                0,
+                (
+                    Case::new(),
+                    PointState::new(0, "Waiting".to_string(), 0, 0, "".to_string()),
+                ),
+            );
         }
-
-        //handle language
-        let mut flag1: bool = false;
-        for i in &config.languages {
-            if *i.name == job.language {
-                flag1 = true;
-            }
-        }
-        //handle user
-        let mut flag2: bool = false;
-        for i in users.iter() {
-            if i.id.unwrap() as i32 == job.user_id {
-                flag2 = true;
-            }
-        }
-
-        if !flag1 || !flag2 {
-            return HttpResponse::NotFound()
-                .json(HTTPerror::new_none(3, "ERR_NOT_FOUND".to_string()));
-        }
-
-        jobstats.sd = Some(r);
-        jobstats.state = "Queuing".to_string();
-        jobstats.result = "Waiting".to_string();
-        jobs.push(jobstats);
     }
 
-    let jbrs = w.await.unwrap();
-    HttpResponse::Ok().json(jbrs)
+    //handle language
+    let mut flag1: bool = false;
+    for i in &config.languages {
+        if *i.name == job.language {
+            flag1 = true;
+        }
+    }
+    //handle user
+    let mut flag2: bool = false;
+    for i in users.iter() {
+        if i.id.unwrap() as i32 == job.user_id {
+            flag2 = true;
+        }
+    }
+    //handle contests
+    let mut cnt_sub: u64 = 0;
+
+    for i in jobs.iter() {
+        if i.submission.user_id == job.user_id
+            && i.submission.contest_id == job.contest_id
+            && i.submission.problem_id == job.problem_id
+        {
+            cnt_sub += 1;
+        }
+    }
+
+    let mut flag3: bool = false;
+    let mut flag4: bool = false;
+    let mut flag5: bool = true;
+    {
+        let contests = CONTEST_LIST.lock().unwrap();
+        for i in contests.iter() {
+            if i.id.unwrap() as i32 == job.contest_id {
+                if cnt_sub >= i.submission_limit {
+                    flag5 = false;
+                }
+                flag4 = true;
+                if i.problem_ids.contains(&(job.problem_id as u64)) {
+                    if (i.from <= created_time && i.to >= created_time) || job.contest_id == 0 {
+                        flag3 = true;
+                    } else {
+                        break;
+                    }
+                }
+                if !i.user_ids.contains(&(job.user_id as u64)) {
+                    flag3 = false;
+                }
+            }
+        }
+    }
+    if !flag1 || !flag2 || !flag4 {
+        return HttpResponse::NotFound().json(HTTPerror::new_none(3, "ERR_NOT_FOUND".to_string()));
+    }
+    if !flag3 {
+        return HttpResponse::BadRequest()
+            .json(HTTPerror::new_none(1, "ERR_INVALID_ARGUMENT".to_string()));
+    }
+    if !flag5 {
+        return HttpResponse::BadRequest()
+            .json(HTTPerror::new_none(4, "ERR_RATE_LIMIT".to_string()));
+    }
+    jobstats.state = "Queueing".to_string();
+    jobstats.result = "Waiting".to_string();
+    jobs.push(jobstats.clone());
+    drop(jobs);
+    {
+        save_jobs().unwrap();
+    }
+    HttpResponse::Ok().json(JobResponse::from_Jobstate(&jobstats))
 }
 pub async fn process_task(config: web::Data<Config>, job_id: usize) {
     log::info!("Processing job {}", job_id);
@@ -111,12 +143,10 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
         let mut jobs = JOB_LIST.lock().unwrap();
         jobs.iter_mut()
             .find(|job| job.id as usize == job_id)
-            .map(|job| job.clone_d())
+            .map(|job| job.clone())
     };
 
     if let Some(mut job) = job_opt {
-        //queuing->running
-        log::info!("I'm processing job {}", job.id);
         job.state = "Waiting".to_string();
         let now = Utc::now();
         let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
@@ -261,21 +291,24 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
             if job.result == "Running" {
                 job.result = "Accepted".to_string();
             }
-
+            log::info!("try to remove {}", filename);
             //remove
             let _ = Command::new("rm").arg(filename);
         }
 
         // 更新 JOB_LIST 中的 job
         {
+            log::info!("1");
+
             let mut jobs = JOB_LIST.lock().unwrap();
 
             if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
-                if let Some(sd) = existing_job.sd.take() {
-                    let _ = sd.send(JobResponse::from_Jobstate(&job));
-                }
                 *existing_job = job;
             }
+            log::info!("update job state :{:?}", jobs);
+            drop(jobs);
+            log::info!("2");
+            save_jobs().unwrap();
         }
     }
 }
@@ -284,7 +317,7 @@ pub async fn process_tasks(config: web::Data<Config>) {
         let job_ids: Vec<usize> = {
             let jobs = JOB_LIST.lock().unwrap();
             jobs.iter()
-                .filter(|job| job.state == "Queuing")
+                .filter(|job| job.state == "Queueing")
                 .map(|job| job.id as usize)
                 .collect()
         };
@@ -308,21 +341,24 @@ async fn get_job_by_id(id: web::Path<u64>) -> HttpResponse {
         ))
     }
 }
-async fn put_job_by_id(config: web::Data<Config>, id: web::Path<u64>) -> HttpResponse {
+async fn put_job_by_id(id: web::Path<u64>) -> HttpResponse {
     let mut flag: bool = false;
-    let (r, w) = oneshot::channel();
-
+    log::info!("response to put_jobs");
     {
         let mut jobs = JOB_LIST.lock().unwrap();
 
         for job in jobs.iter_mut() {
             if job.id == *id {
-                if job.state!="Finished"{
-                    return HttpResponse::BadRequest().json(HTTPerror::new(2,"ERR_INVALID_STATE".to_string(),format!("Job {} not finished",job.id)));
+                if job.state != "Finished" {
+                    return HttpResponse::BadRequest().json(HTTPerror::new(
+                        2,
+                        "ERR_INVALID_STATE".to_string(),
+                        format!("Job {} not finished", job.id),
+                    ));
                 }
                 job.result = "Waiting".to_string();
                 job.score = 0.0;
-                job.state = "Queuing".to_string();
+                job.state = "Queueing".to_string();
                 let now = Utc::now();
                 let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
@@ -331,8 +367,8 @@ async fn put_job_by_id(config: web::Data<Config>, id: web::Path<u64>) -> HttpRes
                     p.result = "Waiting".to_string();
                 }
                 flag = true;
-                job.sd = Some(r);
-                break;
+                let rep = JobResponse::from_Jobstate(&job);
+                return HttpResponse::Ok().json(rep);
             }
         }
     }
@@ -342,14 +378,15 @@ async fn put_job_by_id(config: web::Data<Config>, id: web::Path<u64>) -> HttpRes
             "ERR_NOT_FOUND".to_string(),
             format!("Job {} not found.", *id),
         ));
-    } else {
-        process_task(config, *id as usize).await;
-        let rq = w.await.unwrap();
-        flag = true;
-        return HttpResponse::Ok().json(rq);
     }
+    {
+        save_jobs().unwrap();
+    }
+
+    HttpResponse::Ok().finish()
 }
 async fn delete_job_by_id(id: web::Path<u64>) -> HttpResponse {
+    log::info!("response to delete_job");
     let mut flag: bool = false;
     {
         let mut jobs = JOB_LIST.lock().unwrap();
@@ -360,6 +397,9 @@ async fn delete_job_by_id(id: web::Path<u64>) -> HttpResponse {
                 break;
             }
         }
+    }
+    {
+        save_jobs().unwrap();
     }
     if !flag {
         return HttpResponse::NotFound().json(HTTPerror::new(
@@ -433,7 +473,7 @@ fn fil_true(jf: &JobFilter, jb: &JobState) -> bool {
     true
 }
 async fn get_jobs(filt: web::Query<JobFilter>) -> HttpResponse {
-    log::info!("enter ");
+    log::info!("response to get_jobs");
     let filt = filt.into_inner();
     let mut vc: Vec<JobResponse> = Vec::new();
     let jobs = JOB_LIST.lock().unwrap();
