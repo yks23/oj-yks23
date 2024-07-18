@@ -196,6 +196,13 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
             let now = Utc::now();
             let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
             job.updated_time = created_time;
+            {
+                let mut jobs = JOB_LIST.lock().unwrap();
+
+                if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
+                    *existing_job = job.clone();
+                }
+            }
             // run every point
             for (case, pt) in job.cases[1..].iter_mut() {
                 let input_file = case.input_file.clone();
@@ -295,19 +302,16 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
             //remove
             let _ = Command::new("rm").arg(filename);
         }
-
+        
         // 更新 JOB_LIST 中的 job
         {
-            log::info!("1");
+            {
+                let mut jobs = JOB_LIST.lock().unwrap();
 
-            let mut jobs = JOB_LIST.lock().unwrap();
-
-            if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
-                *existing_job = job;
+                if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
+                    *existing_job = job;
+                }
             }
-            log::info!("update job state :{:?}", jobs);
-            drop(jobs);
-            log::info!("2");
             save_jobs().unwrap();
         }
     }

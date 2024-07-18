@@ -78,7 +78,6 @@ async fn exit() -> impl Responder {
     save_users().expect("User save error");
     save_jobs().expect("Job save error");
     save_contests().expect("Contest save error");
-
     std::process::exit(0);
     format!("Exited")
 }
