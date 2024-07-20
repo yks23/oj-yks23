@@ -7,7 +7,6 @@ use crate::save_contests;
 use actix_web::{web, HttpResponse};
 use std::cmp::Ordering;
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
 async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) -> HttpResponse {
     let mut contests = CONTEST_LIST.lock().unwrap();
     let mut contest = contest.into_inner();
@@ -101,7 +100,7 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
                 "Invalid contest id".to_string(),
             ));
         }
-        let mut flag: bool = false;
+        let mut flag: bool=false;
         for his_con in contests.iter_mut() {
             if &his_con.name == &contest.name {
                 return HttpResponse::BadRequest().json(HTTPerror::new(
@@ -151,7 +150,7 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
         let jblist = JOB_LIST.lock().unwrap();
         for jb in jblist.iter() {
             if jb.submission.contest_id == contest.id.unwrap() as i32 {
-                joblist.push(JobResponse::from_Jobstate(jb));
+                joblist.push(JobResponse::from_jobstate(jb));
             }
         }
     }
@@ -265,8 +264,8 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
         } else {
             let s = cf.tie_breaker.clone().unwrap();
             if s == "submission_time" {
-                let mut latest1: usize;
-                let mut latest2: usize;
+                let  latest1: usize;
+                let  latest2: usize;
                 if submit_id1.len() == 0 {
                     latest1 = 10000;
                 } else {
@@ -320,14 +319,14 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
     {
         let jblist = JOB_LIST.lock().unwrap();
         for jb in jblist.iter() {
-            joblist.push(JobResponse::from_Jobstate(jb));
+            joblist.push(JobResponse::from_jobstate(jb));
         }
     }
     if cf.scoring_rule.is_some() {
         if cf.scoring_rule.clone().unwrap() == "highest" {
             for pbid in contest.problem_ids.iter() {
                 let mut temp_score1: f64 = 0.0;
-                for (ind, i) in joblist.iter().enumerate() {
+                for (_, i) in joblist.iter().enumerate() {
                     if *pbid != i.submission.problem_id as u64 {
                         continue;
                     }
@@ -343,7 +342,7 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
             for pbid in contest.problem_ids.iter() {
                 let mut temp_score1: f64 = 0.0;
 
-                for (ind, i) in joblist.iter().enumerate() {
+                for (_, i) in joblist.iter().enumerate() {
                     if *pbid != i.submission.problem_id as u64 {
                         continue;
                     }
@@ -357,7 +356,7 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
     } else {
         for pbid in contest.problem_ids.iter() {
             let mut temp_score1: f64 = 0.0;
-            for (ind, i) in joblist.iter().enumerate() {
+            for (_, i) in joblist.iter().enumerate() {
                 if *pbid != i.submission.problem_id as u64 {
                     continue;
                 }

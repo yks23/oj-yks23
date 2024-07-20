@@ -1,7 +1,6 @@
 use crate::models::{HTTPerror, User, CONTEST_LIST, USER_LIST};
 use crate::{save_contests, save_users};
 use actix_web::{web, HttpResponse};
-use std::sync::{Arc, Mutex};
 async fn get_users() -> HttpResponse {
     log::info!("Provide users as requested.");
     let users = USER_LIST.lock().unwrap();

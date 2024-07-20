@@ -1,12 +1,7 @@
 use crate::config::Case;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::{fmt, result};
-use tokio::io::Join;
-use tokio::sync::oneshot;
-use tokio::time;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Job {
     pub source_code: String,
@@ -38,7 +33,7 @@ pub struct JobResponse {
     pub cases: Vec<PointState>,
 }
 impl JobResponse {
-    pub fn from_Jobstate(jbs: &JobState) -> JobResponse {
+    pub fn from_jobstate(jbs: &JobState) -> JobResponse {
         JobResponse {
             id: jbs.id,
             created_time: jbs.created_time.clone(),
@@ -110,6 +105,16 @@ impl JobState {
             cases: Vec::new(),
         }
     }
+    pub fn update_score(&mut self){
+        let mut score:f64=0.0;
+        for (c, p) in &self.cases {
+                    if p.result == "Accepted" {
+                        score += c.score;
+                    }
+                }
+        self.score=score;
+            }
+    
 }
 impl HTTPerror {
     pub fn new(code: u64, reason: String, message: String) -> HTTPerror {
