@@ -1,7 +1,10 @@
 use crate::config::Case;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    thread::panicking,
+};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Job {
     pub source_code: String,
@@ -41,16 +44,8 @@ impl JobResponse {
             submission: jbs.submission.clone(),
             state: jbs.state.clone(),
             result: jbs.result.clone(),
-            score: {
-                let mut sc: f64 = 0.0;
-                for (c, p) in &jbs.cases {
-                    if p.result == "Accepted" {
-                        sc += c.score;
-                    }
-                }
-                sc
-            },
-            cases:jbs.cases.iter().map(|(_,p)| p.clone()).collect()
+            score: jbs.score,
+            cases: jbs.cases.iter().map(|(_, p)| p.clone()).collect(),
         }
     }
 }
@@ -79,10 +74,10 @@ impl PointState {
         }
     }
 }
-#[derive(Serialize,Deserialize, Clone,Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct JobState {
     pub id: u64,
-    pub problem_id:usize,
+    pub problem_id: usize,
     pub created_time: String,
     pub updated_time: String,
     pub submission: Job,
@@ -95,7 +90,7 @@ impl JobState {
     pub fn new() -> JobState {
         JobState {
             id: 0,
-            problem_id:0,
+            problem_id: 0,
             created_time: "".to_string(),
             updated_time: "".to_string(),
             submission: Job::new(),
@@ -105,16 +100,34 @@ impl JobState {
             cases: Vec::new(),
         }
     }
-    pub fn update_score(&mut self){
-        let mut score:f64=0.0;
-        for (c, p) in &self.cases {
-                    if p.result == "Accepted" {
-                        score += c.score;
+    pub fn update_score(&mut self, packing: &Option<Vec<Vec<usize>>>) {
+        let mut score: f64 = 0.0;
+        if packing.is_none() {
+            log::info!("Actually nothing");
+            for (c, p) in &self.cases {
+                if p.result == "Accepted" {
+                    score += c.score;
+                }
+            }
+        } else {
+            log::info!("{:?}", packing);
+            let vc = packing.clone().unwrap();
+            for packs in vc.iter() {
+                let mut bl = true;
+                for i in packs {
+                    if self.cases[*i].1.result != "Accepted" {
+                        bl = false;
                     }
                 }
-        self.score=score;
+                if bl {
+                    for i in packs {
+                        score += self.cases[*i].0.score;
+                    }
+                }
             }
-    
+        }
+        self.score = score;
+    }
 }
 impl HTTPerror {
     pub fn new(code: u64, reason: String, message: String) -> HTTPerror {
@@ -157,30 +170,35 @@ lazy_static! {
 pub struct JobFilter {
     pub user_id: Option<u64>,
     pub user_name: Option<String>,
-    pub contest_id:Option<u64>,
-    pub problem_id:Option<u64>,
-    pub language:Option<String>,
-    pub from:Option<String>,
-    pub to :Option<String>,
-    pub state:Option<String>,
-    pub result:Option<String>,
+    pub contest_id: Option<u64>,
+    pub problem_id: Option<u64>,
+    pub language: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub state: Option<String>,
+    pub result: Option<String>,
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ContestConfig {
     pub scoring_rule: Option<String>,
     pub tie_breaker: Option<String>,
-
 }
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UserRank {
-    pub user:User,
-    pub rank:u64,
-    pub scores:Vec<f64>,
+    pub user: User,
+    pub rank: u64,
+    pub scores: Vec<f64>,
 }
 
-impl UserRank{
-    pub fn new()->UserRank{
-        UserRank{user:User{name:"".to_string(),id:None},rank:0,scores:Vec::new()}
+impl UserRank {
+    pub fn new() -> UserRank {
+        UserRank {
+            user: User {
+                name: "".to_string(),
+                id: None,
+            },
+            rank: 0,
+            scores: Vec::new(),
+        }
     }
 }
-

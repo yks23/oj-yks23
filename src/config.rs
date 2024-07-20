@@ -28,13 +28,18 @@ impl  Case {
         Case{score:0.0,input_file:"".to_string(),answer_file:"".to_string(),time_limit:0,memory_limit:0}
     }
 }
+#[derive(Serialize,Deserialize,Clone,Debug)]
+pub struct Misc {
+   pub packing:Option<Vec<Vec<usize>>>,
+   pub special_judge:Option<Vec<String>>,
+}
 #[derive(Deserialize)]
 pub struct Problem {
     pub id: u64,
     pub name: String,
     #[serde(rename="type")]
     pub problem_type:String,
-    pub misc:HashMap<String,String>,
+    pub misc:Misc,
     pub cases:Vec<Case>,
 
 }

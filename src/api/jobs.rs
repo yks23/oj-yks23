@@ -9,6 +9,7 @@ use chrono::Utc;
 use futures::future::join_all;
 use glob::glob;
 use std::process::Stdio;
+use std::thread::panicking;
 use std::time::Instant;
 use tokio::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -185,6 +186,12 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
         let now_job = job.submission.clone();
         let mut filename: String = String::new();
         let mut commands: Vec<String> = Vec::new();
+        let mut packing: Option<Vec<Vec<usize>>> = None;
+        for i in &config.problems {
+            if i.id == job.problem_id as u64 {
+                packing = i.misc.packing.clone();
+            }
+        }
         for i in &config.languages {
             if i.name == now_job.language {
                 filename = i.file_name.clone();
@@ -234,7 +241,29 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 }
             }
             // Run every test case
-            for (idx, (case, pt)) in job.cases[1..].iter_mut().enumerate() {
+            let mut skipped_point: Vec<usize> = Vec::new();
+            for (idx, (case, pt)) in job.cases.iter_mut().enumerate() {
+                if idx == 0 {
+                    continue;
+                };
+                //decide whether need to skip
+                if skipped_point.contains(&idx) {
+                    pt.result = "Skipped".to_string();
+                    {
+                        let mut jobs = JOB_LIST.lock().unwrap();
+
+                        if let Some(existing_job) =
+                            jobs.iter_mut().find(|j| j.id as usize == job_id)
+                        {
+                            if *skipped_point.last().unwrap() == idx {
+                                existing_job.updated_time = job.updated_time.clone();
+                            }
+                            existing_job.cases[idx].1.result = pt.result.clone();
+                        }
+                    }
+                    save_jobs().unwrap();
+                    continue;
+                }
                 let input_file = case.input_file.clone();
                 let expected_output_file = case.answer_file.clone();
 
@@ -333,6 +362,21 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                         }
                     }
                 }
+                if pt.result != "Accepted" && packing.is_some() {
+                    if packing.is_some() {
+                        for pack in packing.clone().unwrap() {
+                            if pack.contains(&idx) {
+                                for j in pack {
+                                    if j > idx {
+                                        skipped_point.push(j);
+                                        log::info!("put {} because {}", j, idx);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 let now = Utc::now();
                 let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
                 job.updated_time = created_time;
@@ -348,7 +392,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                             existing_job.state = job.state.clone();
                             existing_job.cases[idx].1.result = pt.result.clone();
                             existing_job.cases[idx].1.time = pt.time.clone();
-                            existing_job.update_score();
+                            existing_job.update_score(&packing);
                         }
                     }
                     save_jobs().unwrap();
@@ -359,7 +403,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 job.result = "Accepted".to_string();
             }
         }
-        job.update_score();
+        job.update_score(&packing);
         // Update job in JOB_LIST
         {
             {
@@ -398,6 +442,7 @@ pub async fn process_tasks(config: web::Data<Config>) {
 
 // Get job by ID
 async fn get_job_by_id(id: web::Path<u64>) -> HttpResponse {
+    log::info!("ask for job {}", id);
     let jobs = JOB_LIST.lock().unwrap();
     let job = jobs.iter().find(|&job| job.id == *id);
     if let Some(jobn) = job {

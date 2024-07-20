@@ -1,1 +1,1 @@
-fn main() { println!("Hello World!"); }
+fn main() { std::thread::sleep(std::time::Duration::from_millis(100)); println!("Hello World!"); }
