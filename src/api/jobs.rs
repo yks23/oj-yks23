@@ -8,6 +8,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use futures::future::join_all;
 use glob::glob;
+use std::clone;
 use std::process::Stdio;
 use std::thread::panicking;
 use std::time::Instant;
@@ -164,8 +165,6 @@ async fn read_file_async(file_path: &str) -> std::io::Result<String> {
     file.read_to_string(&mut contents).await?;
     Ok(contents)
 }
-
-// Process a specific job
 pub async fn process_task(config: web::Data<Config>, job_id: usize) {
     log::info!("Processing job {}", job_id);
 
@@ -187,9 +186,13 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
         let mut filename: String = String::new();
         let mut commands: Vec<String> = Vec::new();
         let mut packing: Option<Vec<Vec<usize>>> = None;
+        let mut special_judge: Option<Vec<String>> = None;
+        let mut prom_type = "".to_string();
         for i in &config.problems {
             if i.id == job.problem_id as u64 {
                 packing = i.misc.packing.clone();
+                special_judge = i.misc.special_judge.clone();
+                prom_type = i.problem_type.clone();
             }
         }
         for i in &config.languages {
@@ -245,8 +248,9 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
             for (idx, (case, pt)) in job.cases.iter_mut().enumerate() {
                 if idx == 0 {
                     continue;
-                };
-                //decide whether need to skip
+                }
+
+                // Decide whether need to skip
                 if skipped_point.contains(&idx) {
                     pt.result = "Skipped".to_string();
                     {
@@ -264,6 +268,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                     save_jobs().unwrap();
                     continue;
                 }
+
                 let input_file = case.input_file.clone();
                 let expected_output_file = case.answer_file.clone();
 
@@ -316,27 +321,59 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                                 .await
                                 .expect("Unable to read expected output file");
 
-                            // Compare actual output with expected output
                             let output_stdout = String::from_utf8_lossy(&output.stdout);
-                            log::info!("{} {}", expected_output, output_stdout);
-                            let mut prom_type: String = "".to_string();
-                            for pp in &config.problems {
-                                if pp.id == job.problem_id as u64 {
-                                    prom_type = pp.problem_type.clone();
+                            let output_file_path = format!("output_{}.txt", idx);
+                            tokio::fs::write(&output_file_path, output_stdout.as_bytes())
+                                .await
+                                .unwrap();
+ 
+                            if let Some(spj) = &special_judge {
+                                // Special Judge logic
+                                let spj_command: Vec<String> = spj
+                                    .iter()
+                                    .map(|s| match s.as_str() {
+                                        "%OUTPUT%" => output_file_path.clone(),
+                                        "%ANSWER%" => case.answer_file.clone(),
+                                        _ => s.to_string(),
+                                    })
+                                    .collect();
+
+                                let spj_output = Command::new(&spj_command[0])
+                                    .args(&spj_command[1..])
+                                    .output()
+                                    .await
+                                    .expect("Failed to run SPJ");
+
+                                let spj_stdout = String::from_utf8_lossy(&spj_output.stdout);
+                                let spj_result: Vec<&str> = spj_stdout.split('\n').collect();
+
+                                if spj_result.len() >= 2 {
+                                    pt.result = spj_result[0].to_string();
+                                    pt.info = spj_result[1].to_string();
+                                } else {
+                                    pt.result = "SPJ Error".to_string();
+                                    pt.info = "Invalid SPJ output format".to_string();
                                 }
-                            }
-                            let flag: bool = match prom_type {
-                                s if s == "strict" => {
-                                    strict_compare(&output_stdout, &expected_output)
-                                }
-                                _ => loose_compare(&output_stdout, &expected_output),
-                            };
-                            if flag {
-                                pt.result = "Accepted".to_string();
-                            } else {
-                                pt.result = "Wrong Answer".to_string();
-                                if job.result == "Running" {
+
+                                if spj_output.status.success() && pt.result == "Accepted" {
+                                    job.result = "Accepted".to_string();
+                                } else {
                                     job.result = "Wrong Answer".to_string();
+                                }
+                            } else {
+                                // Default comparison logic
+                                let flag = match prom_type.as_str() {
+                                    "strict" => strict_compare(&output_stdout, &expected_output),
+                                    _ => loose_compare(&output_stdout, &expected_output),
+                                };
+
+                                if flag {
+                                    pt.result = "Accepted".to_string();
+                                } else {
+                                    pt.result = "Wrong Answer".to_string();
+                                    if job.result == "Running" {
+                                        job.result = "Wrong Answer".to_string();
+                                    }
                                 }
                             }
                         } else {
@@ -362,18 +399,17 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                         }
                     }
                 }
+
                 if pt.result != "Accepted" && packing.is_some() {
-                    if packing.is_some() {
-                        for pack in packing.clone().unwrap() {
-                            if pack.contains(&idx) {
-                                for j in pack {
-                                    if j > idx {
-                                        skipped_point.push(j);
-                                        log::info!("put {} because {}", j, idx);
-                                    }
+                    for pack in packing.clone().unwrap() {
+                        if pack.contains(&idx) {
+                            for j in pack {
+                                if j > idx {
+                                    skipped_point.push(j);
+                                    log::info!("put {} because {}", j, idx);
                                 }
-                                break;
                             }
+                            break;
                         }
                     }
                 }
@@ -381,22 +417,18 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
                 job.updated_time = created_time;
                 {
-                    {
-                        let mut jobs = JOB_LIST.lock().unwrap();
+                    let mut jobs = JOB_LIST.lock().unwrap();
 
-                        if let Some(existing_job) =
-                            jobs.iter_mut().find(|j| j.id as usize == job_id)
-                        {
-                            existing_job.updated_time = job.updated_time.clone();
-                            existing_job.result = job.result.clone();
-                            existing_job.state = job.state.clone();
-                            existing_job.cases[idx].1.result = pt.result.clone();
-                            existing_job.cases[idx].1.time = pt.time.clone();
-                            existing_job.update_score(&packing);
-                        }
+                    if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
+                        existing_job.updated_time = job.updated_time.clone();
+                        existing_job.result = job.result.clone();
+                        existing_job.state = job.state.clone();
+                        existing_job.cases[idx].1.result = pt.result.clone();
+                        existing_job.cases[idx].1.time = pt.time;
+                        existing_job.update_score(&packing);
                     }
-                    save_jobs().unwrap();
                 }
+                save_jobs().unwrap();
             }
             job.state = "Finished".to_string();
             if job.result == "Running" {
@@ -406,19 +438,15 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
         job.update_score(&packing);
         // Update job in JOB_LIST
         {
-            {
-                let mut jobs = JOB_LIST.lock().unwrap();
+            let mut jobs = JOB_LIST.lock().unwrap();
 
-                if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
-                    *existing_job = job;
-                }
+            if let Some(existing_job) = jobs.iter_mut().find(|j| j.id as usize == job_id) {
+                *existing_job = job;
             }
-            save_jobs().unwrap();
         }
+        save_jobs().unwrap();
     }
-}
-
-// Continuously process tasks in the queue
+} // Continuously process tasks in the queue
 pub async fn process_tasks(config: web::Data<Config>) {
     loop {
         let job_ids: Vec<usize> = {

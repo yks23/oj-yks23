@@ -3,7 +3,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     sync::{Arc, Mutex},
-    thread::panicking,
 };
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Job {
