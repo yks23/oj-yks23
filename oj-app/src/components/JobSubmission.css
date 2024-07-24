@@ -1,0 +1,57 @@
+.job-submission-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.input-field {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.submit-button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.submit-button:hover {
+    background-color: #45a049;
+}
+.section-title {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+.response-container {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #e9ffe9;
+    border: 1px solid #d4ffd4;
+    border-radius: 5px;
+}
+
+.case-result {
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.error-container {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #ffe9e9;
+    border: 1px solid #ffd4d4;
+    border-radius: 5px;
+}

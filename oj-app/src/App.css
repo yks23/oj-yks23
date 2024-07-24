@@ -1,0 +1,112 @@
+.app-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.section {
+    margin-bottom: 40px;
+}
+
+.section-title {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+.input-field {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.submit-button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.submit-button:hover {
+    background-color: #45a049;
+}
+
+.error-container {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #ffe9e9;
+    border: 1px solid #ffd4d4;
+    border-radius: 5px;
+}
+
+.ranklist {
+    margin-top: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+/* Container for the navbar */
+.navbar-container {
+    display: flex;
+    justify-content: center; /* Centers the navbar horizontally */
+    padding: 10px; /* Adds some padding around the navbar */
+    background-color: #f8f8f8; /* Background color for the container */
+    border: 1px solid #ccc; /* Border for the container */
+    border-radius: 5px; /* Rounded corners for the container */
+}
+
+/* Navbar itself */
+.navbar {
+    display: flex;
+    justify-content: space-around; /* Distributes items evenly */
+    width: 100%;
+    max-width: 800px; /* Maximum width for the navbar */
+}
+
+/* Individual links */
+.navbar a {
+    text-decoration: none; /* Removes underline from links */
+    padding: 10px 20px; /* Adds padding to the links */
+    color: #333; /* Text color for the links */
+    border-radius: 5px; /* Rounded corners for the links */
+    transition: background-color 0.3s; /* Smooth transition for background color */
+}
+
+/* Hover effect for links */
+.navbar a:hover {
+    background-color: #ddd; /* Background color on hover */
+}
+
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100px; 
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+}
