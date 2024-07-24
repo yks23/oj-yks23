@@ -1,6 +1,6 @@
 // src/components/ExitButton.js
 import React from 'react';
-
+import 'bootstrap/dist/css/bootstrap.min.css';
 const ExitButton = () => {
     const handleExit = async () => {
         try {
@@ -23,7 +23,7 @@ const ExitButton = () => {
     };
 
     return (
-        <button onClick={handleExit}>Shut Down Server</button>
+        <button onClick={handleExit} className='btn btn-success'>Shut Down Server</button>
     );
 };
 

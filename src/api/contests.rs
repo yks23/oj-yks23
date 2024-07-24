@@ -7,17 +7,22 @@ use crate::save_contests;
 use actix_web::{web, HttpResponse};
 use std::cmp::Ordering;
 use std::collections::HashSet;
+
 async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) -> HttpResponse {
     let mut contests = CONTEST_LIST.lock().unwrap();
     let mut contest = contest.into_inner();
+
+    // Set a default submission limit if not specified
     if contest.submission_limit == 0 {
         contest.submission_limit = 10086;
     }
 
     {
         let mut tb: HashSet<u64> = HashSet::new();
+
+        // Validate user_ids for uniqueness and existence
         for i in &contest.user_ids {
-            if tb.contains(&i) {
+            if tb.contains(i) {
                 return HttpResponse::BadRequest().json(HTTPerror::new(
                     1,
                     "ERR_INVALID_ARGUMENT".to_string(),
@@ -26,23 +31,26 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
             } else {
                 tb.insert(*i);
             }
+
             let mut flag: bool = false;
-            {
-                for j in USER_LIST.lock().unwrap().iter() {
-                    if j.id.unwrap() == *i {
-                        flag = true;
-                    }
+            for j in USER_LIST.lock().unwrap().iter() {
+                if j.id.unwrap() == *i {
+                    flag = true;
                 }
             }
+
             if !flag {
                 return HttpResponse::NotFound().json(HTTPerror::new(
                     3,
                     "ERR_NOT_FOUND".to_string(),
-                    format!("Contest {} not found.", contest.id.unwrap()),
+                    format!("User {} not found.", *i),
                 ));
             }
         }
+
         tb.clear();
+
+        // Validate problem_ids for uniqueness and existence
         for i in &contest.problem_ids {
             if tb.contains(i) {
                 return HttpResponse::BadRequest().json(HTTPerror::new(
@@ -53,23 +61,25 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
             } else {
                 tb.insert(*i);
             }
+
             let mut flag: bool = false;
             for j in &config.problems {
                 if j.id == *i {
                     flag = true;
                 }
             }
+
             if !flag {
                 return HttpResponse::NotFound().json(HTTPerror::new(
                     3,
                     "ERR_NOT_FOUND".to_string(),
-                    format!("Contest {} not found.", contest.id.unwrap()),
+                    format!("Problem {} not found.", *i),
                 ));
             }
         }
-        //check duplication
     }
-    // 自动生成新的唯一 id
+
+    // Check for contest duplication by name and assign a new ID if necessary
     if contest.id.is_none() {
         for his_con in contests.iter() {
             if his_con.name == contest.name {
@@ -80,19 +90,23 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
                 ));
             }
         }
-        let new_id = if let Some(last_user) = contests.last() {
-            last_user.id.unwrap() + 1
+
+        let new_id = if let Some(last_contest) = contests.last() {
+            last_contest.id.unwrap() + 1
         } else {
-            0
+            1
         };
+
         contest.id = Some(new_id);
         contests.push(contest.clone());
         log::info!(
-            "{}",
-            format!("Successfully create new Contest {} !!", contest.name)
+            "Successfully created new Contest {}",
+            contest.name
         );
+
         return HttpResponse::Ok().json(contests.last().unwrap());
     } else {
+        // Update existing contest by ID
         if contest.id.unwrap() == 0 {
             return HttpResponse::BadRequest().json(HTTPerror::new(
                 1,
@@ -100,7 +114,9 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
                 "Invalid contest id".to_string(),
             ));
         }
-        let mut flag: bool=false;
+
+        let mut flag: bool = false;
+
         for his_con in contests.iter_mut() {
             if &his_con.name == &contest.name {
                 return HttpResponse::BadRequest().json(HTTPerror::new(
@@ -110,18 +126,21 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
                 ));
             }
         }
+
         for his_con in contests.iter_mut() {
             if &his_con.id.unwrap() == &contest.id.unwrap() {
                 log::info!(
-                    "Successfully change Contest {} 's name to {}",
+                    "Successfully changed Contest {}'s name to {}",
                     contest.id.unwrap(),
                     contest.name
                 );
+
                 flag = true;
                 his_con.name = contest.name.clone();
                 return HttpResponse::Ok().json(his_con);
             }
         }
+
         if !flag {
             return HttpResponse::NotFound().json(HTTPerror::new(
                 3,
@@ -130,13 +149,14 @@ async fn post_contest(config: web::Data<Config>, contest: web::Json<Contest>) ->
             ));
         }
     }
+
     let nt = contests.last().unwrap().clone();
     drop(contests);
-    {
-        save_contests().unwrap();
-    }
+    save_contests().unwrap();
+
     HttpResponse::Ok().json(nt)
 }
+
 fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> Ordering {
     let mut score1: f64 = 0.0;
     let mut score2: f64 = 0.0;
@@ -154,6 +174,7 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
             }
         }
     }
+
     if cf.scoring_rule.is_some() {
         if cf.scoring_rule.clone().unwrap() == "highest" {
             for pbid in contest.problem_ids.iter() {
@@ -161,10 +182,12 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
                 let mut temp_score1: f64 = 0.0;
                 let mut cnt_index1: usize = 10000;
                 let mut cnt_index2: usize = 10000;
+
                 for (ind, i) in joblist.iter().enumerate() {
                     if *pbid != i.submission.problem_id as u64 {
                         continue;
                     }
+
                     if i.submission.user_id == a.id.unwrap() as i32 {
                         sub_cnt1 += 1;
                         if temp_score1 < i.score {
@@ -172,6 +195,7 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
                             cnt_index1 = ind;
                         }
                     }
+
                     if i.submission.user_id == b.id.unwrap() as i32 {
                         sub_cnt2 += 1;
                         if temp_score2 < i.score {
@@ -180,6 +204,7 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
                         }
                     }
                 }
+
                 if cnt_index1 != 10000 {
                     submit_id1.push(cnt_index1);
                 }
@@ -195,21 +220,25 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
                 let mut temp_score1: f64 = 0.0;
                 let mut cnt_index1: usize = 10000;
                 let mut cnt_index2: usize = 10000;
+
                 for (ind, i) in joblist.iter().enumerate() {
                     if *pbid != i.submission.problem_id as u64 {
                         continue;
                     }
+
                     if i.submission.user_id == a.id.unwrap() as i32 {
                         sub_cnt1 += 1;
                         temp_score1 = i.score;
                         cnt_index1 = ind;
                     }
+
                     if i.submission.user_id == b.id.unwrap() as i32 {
                         sub_cnt2 += 1;
                         temp_score2 = i.score;
                         cnt_index2 = ind;
                     }
                 }
+
                 if cnt_index1 != 10000 {
                     submit_id1.push(cnt_index1);
                 }
@@ -226,21 +255,25 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
             let mut temp_score1: f64 = 0.0;
             let mut cnt_index1: usize = 10000;
             let mut cnt_index2: usize = 10000;
+
             for (ind, i) in joblist.iter().enumerate() {
                 if *pbid != i.submission.problem_id as u64 {
                     continue;
                 }
+
                 if i.submission.user_id == a.id.unwrap() as i32 {
                     sub_cnt1 += 1;
                     temp_score1 = i.score;
                     cnt_index1 = ind;
                 }
+
                 if i.submission.user_id == b.id.unwrap() as i32 {
                     sub_cnt2 += 1;
                     temp_score2 = i.score;
                     cnt_index2 = ind;
                 }
             }
+
             if cnt_index1 != 10000 {
                 submit_id1.push(cnt_index1);
             }
@@ -264,18 +297,8 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
         } else {
             let s = cf.tie_breaker.clone().unwrap();
             if s == "submission_time" {
-                let  latest1: usize;
-                let  latest2: usize;
-                if submit_id1.len() == 0 {
-                    latest1 = 10000;
-                } else {
-                    latest1 = submit_id1.iter().fold(0, |a, b| usize::max(a, *b));
-                }
-                if submit_id2.len() == 0 {
-                    latest2 = 10000;
-                } else {
-                    latest2 = submit_id2.iter().fold(0, |a, b| usize::max(a, *b));
-                }
+                let latest1 = submit_id1.iter().copied().max().unwrap_or(10000);
+                let latest2 = submit_id2.iter().copied().max().unwrap_or(10000);
                 if latest1 < latest2 {
                     return Ordering::Greater;
                 }
@@ -312,6 +335,7 @@ fn cmp_by_config(cf: &ContestConfig, a: &User, b: &User, contest: &Contest) -> O
     }
     Ordering::Equal
 }
+
 fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
     let mut scores: Vec<f64> = Vec::new();
 
@@ -322,14 +346,17 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
             joblist.push(JobResponse::from_jobstate(jb));
         }
     }
+
     if cf.scoring_rule.is_some() {
         if cf.scoring_rule.clone().unwrap() == "highest" {
             for pbid in contest.problem_ids.iter() {
                 let mut temp_score1: f64 = 0.0;
+
                 for (_, i) in joblist.iter().enumerate() {
                     if *pbid != i.submission.problem_id as u64 {
                         continue;
                     }
+
                     if i.submission.user_id == a.id.unwrap() as i32 {
                         if temp_score1 < i.score {
                             temp_score1 = i.score;
@@ -346,6 +373,7 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
                     if *pbid != i.submission.problem_id as u64 {
                         continue;
                     }
+
                     if i.submission.user_id == a.id.unwrap() as i32 {
                         temp_score1 = i.score;
                     }
@@ -356,10 +384,12 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
     } else {
         for pbid in contest.problem_ids.iter() {
             let mut temp_score1: f64 = 0.0;
+
             for (_, i) in joblist.iter().enumerate() {
                 if *pbid != i.submission.problem_id as u64 {
                     continue;
                 }
+
                 if i.submission.user_id == a.id.unwrap() as i32 {
                     temp_score1 = i.score;
                 }
@@ -369,14 +399,17 @@ fn get_score_list(cf: &ContestConfig, a: &User, contest: &Contest) -> Vec<f64> {
     }
     scores
 }
+
 async fn get_ranklist(id: web::Path<u64>, contestcfg: web::Query<ContestConfig>) -> HttpResponse {
     let mut ranklist: Vec<_> = Vec::new();
     let mut contest: Contest;
+
     {
         let users = USER_LIST.lock().unwrap();
         let mut flag: bool = false;
         let contests = CONTEST_LIST.lock().unwrap();
         contest = contests.last().unwrap().clone();
+
         for i in contests.iter() {
             if i.id.unwrap() == *id {
                 contest = i.clone();
@@ -392,6 +425,7 @@ async fn get_ranklist(id: web::Path<u64>, contestcfg: web::Query<ContestConfig>)
                 format!("Contest {} not found.", id),
             ));
         }
+
         for k in contest.user_ids.iter() {
             for us in users.iter() {
                 if us.id.unwrap() == *k {
@@ -400,30 +434,38 @@ async fn get_ranklist(id: web::Path<u64>, contestcfg: web::Query<ContestConfig>)
             }
         }
     }
+
     ranklist.sort_by(|a, b| cmp_by_config(&contestcfg, b, a, &contest));
     let mut final_rank: Vec<UserRank> = Vec::new();
+
     for us in ranklist.iter() {
         let mut ur = UserRank::new();
         ur.user = us.clone();
         ur.rank = 1;
+
         for j in ranklist.iter() {
             if cmp_by_config(&contestcfg, us, j, &contest) == Ordering::Less {
                 ur.rank += 1;
             }
         }
+
         ur.scores = get_score_list(&contestcfg, us, &contest);
         final_rank.push(ur.clone());
     }
+
     HttpResponse::Ok().json(final_rank)
 }
+
 async fn get_contest() -> HttpResponse {
     let mut vc: Vec<Contest> = CONTEST_LIST.lock().unwrap().to_vec();
-    vc.remove(0);
+    vc.remove(0); // Remove the first element, assuming it's a placeholder
     HttpResponse::Ok().json(vc)
 }
+
 async fn get_contest_by_id(id: web::Path<u64>) -> HttpResponse {
     let contests = CONTEST_LIST.lock().unwrap();
     let id = id.into_inner();
+
     if id == 0 {
         return HttpResponse::BadRequest().json(HTTPerror::new(
             1,
@@ -431,7 +473,9 @@ async fn get_contest_by_id(id: web::Path<u64>) -> HttpResponse {
             "Invalid contest id".to_string(),
         ));
     }
+
     let contest = contests.iter().find(|&contest| contest.id.unwrap() == id);
+
     if let Some(cont) = contest {
         HttpResponse::Ok().json(cont)
     } else {
@@ -442,6 +486,7 @@ async fn get_contest_by_id(id: web::Path<u64>) -> HttpResponse {
         ))
     }
 }
+
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/contests/{id}/ranklist").route(web::get().to(get_ranklist)));
     cfg.service(

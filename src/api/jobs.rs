@@ -8,9 +8,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use futures::future::join_all;
 use glob::glob;
-use std::clone;
 use std::process::Stdio;
-use std::thread::panicking;
 use std::time::Instant;
 use tokio::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -509,6 +507,8 @@ async fn put_job_by_id(id: web::Path<u64>) -> HttpResponse {
                 job.updated_time = created_time;
                 for (_, p) in job.cases.iter_mut() {
                     p.result = "Waiting".to_string();
+                    p.time=0;
+                    p.memory=0;
                 }
                 flag = true;
                 let rep = JobResponse::from_jobstate(&job);

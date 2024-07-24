@@ -1,66 +1,71 @@
 use crate::models::{HTTPerror, User, CONTEST_LIST, USER_LIST};
 use crate::{save_contests, save_users};
 use actix_web::{web, HttpResponse};
+
+// Handler for getting the list of users
 async fn get_users() -> HttpResponse {
     log::info!("Provide users as requested.");
     let users = USER_LIST.lock().unwrap();
     HttpResponse::Ok().json(&*users)
 }
 
+// Handler for adding a new user or updating an existing one
 async fn post_user(new_user: web::Json<User>) -> HttpResponse {
     let mut users = USER_LIST.lock().unwrap();
     let mut user = new_user.into_inner();
 
-    // 自动生成新的唯一 id
+    // Automatically generate a new unique ID if not provided
     if user.id.is_none() {
-        for his_user in users.iter() {
-            if his_user.name == user.name {
-                return HttpResponse::BadRequest().json(HTTPerror::new(
-                    1,
-                    "ERR_INVALID_ARGUMENT".to_string(),
-                    format!("User name '{}' already exists.", user.name),
-                ));
-            }
+        // Check if the user name already exists
+        if users.iter().any(|u| u.name == user.name) {
+            return HttpResponse::BadRequest().json(HTTPerror::new(
+                1,
+                "ERR_INVALID_ARGUMENT".to_string(),
+                format!("User name '{}' already exists.", user.name),
+            ));
         }
-        let new_id = if let Some(last_user) = users.last() {
-            last_user.id.unwrap() + 1
-        } else {
-            0
-        };
+
+        // Generate new ID
+        let new_id = users.last().map_or(0, |last_user| last_user.id.unwrap() + 1);
         user.id = Some(new_id);
         users.push(user.clone());
-        log::info!(
-            "{}",
-            format!("Successfully create new user {} !!", user.name)
-        );
+        log::info!("Successfully created new user {} !!", user.name);
+
+        // Add new user ID to the first contest's user list
         {
             let mut contests = CONTEST_LIST.lock().unwrap();
             contests[0].user_ids.push(new_id);
         }
+
+        // Save users and contests data
+        save_users().unwrap();
+        save_contests().unwrap();
+
         return HttpResponse::Ok().json(users.last().unwrap());
     } else {
-        let mut flag: bool = false;
-        for his_user in users.iter_mut() {
-            if &his_user.name == &user.name {
-                return HttpResponse::BadRequest().json(HTTPerror::new(
-                    1,
-                    "ERR_INVALID_ARGUMENT".to_string(),
-                    format!("User name '{}' already exists.", user.name),
-                ));
-            }
+        // Check if updating an existing user
+        if users.iter().any(|u| u.name == user.name && u.id != user.id) {
+            return HttpResponse::BadRequest().json(HTTPerror::new(
+                1,
+                "ERR_INVALID_ARGUMENT".to_string(),
+                format!("User name '{}' already exists.", user.name),
+            ));
         }
-        for his_user in users.iter_mut() {
-            if &his_user.id.unwrap() == &user.id.unwrap() {
+
+        let mut flag = false;
+        for existing_user in users.iter_mut() {
+            if existing_user.id == user.id {
                 log::info!(
-                    "Successfully change user {} 's name to {}",
+                    "Successfully changed user {}'s name to {}",
                     user.id.unwrap(),
                     user.name
                 );
+                existing_user.name = user.name.clone();
                 flag = true;
-                his_user.name = user.name.clone();
-                return HttpResponse::Ok().json(his_user);
+                break;
             }
         }
+
         if !flag {
             return HttpResponse::NotFound().json(HTTPerror::new(
                 3,
@@ -68,16 +73,16 @@ async fn post_user(new_user: web::Json<User>) -> HttpResponse {
                 format!("User {} not found.", user.id.unwrap()),
             ));
         }
-    }
-    let us = users.last().unwrap().clone();
-    drop(users);
-    {
+
+        // Save users and contests data
         save_users().unwrap();
         save_contests().unwrap();
+
+        return HttpResponse::Ok().json(user);
     }
-    HttpResponse::Ok().json(us)
 }
 
+// Initialize the routes for the users service
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/users")

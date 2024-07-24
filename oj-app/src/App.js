@@ -7,11 +7,12 @@ import ExitButton from './components/ExitButton';
 import UserManagement from './components/UserManagement';
 import Footer from './components/Footer';
 import './App.css';
-
+import 'bootstrap/dist/css/bootstrap.min.css';
 const App = () => {
     return (
+        <body className='bg-dark'>
         <Router>
-            <div className="app-container">
+            <div className="app-container bg-dark">
                 <h1 className="section-title">OJ System</h1>
                 <nav className="navbar-container">
                     <div className='navbar'>
@@ -36,6 +37,7 @@ const App = () => {
             
             <div > <Footer /></div>
         </Router>
+        </body>
     );
 };
 

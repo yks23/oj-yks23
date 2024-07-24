@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import './JobSubmission.css';
-
+import 'bootstrap/dist/css/bootstrap.min.css';
 const JobSubmission = () => {
     const [sourceCode, setSourceCode] = useState('');
     const [language, setLanguage] = useState('Rust');
@@ -11,7 +11,8 @@ const JobSubmission = () => {
     const [response, setResponse] = useState(null);
     const [requestText, setRequestText] = useState('');
     const [errorText, setErrorText] = useState('');
-
+    const [jobId, setJobId] = useState('');
+    const [delId, setdelId] = useState('');
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -52,6 +53,60 @@ ${JSON.stringify(requestBody, null, 2)}`;
             console.error('Error submitting job:', error);
         }
     };
+    const handlePut = async (e) => {
+    e.preventDefault();
+    const jobIdNumber = parseInt(jobId, 10);
+    if (isNaN(jobIdNumber)) {
+        setErrorText("Invalid Job ID. Please enter a valid numeric Job ID.");
+        return;
+    }
+
+    try {
+        const res = await axios.put(`http://localhost:12345/jobs/${jobIdNumber}`, null, { timeout: 5000 });
+        console.log('Received response:', res.data);
+        setResponse(res.data);
+        setErrorText('');
+    } catch (error) {
+        setResponse(null);
+        let detailedError = "Error updating job";
+        if (error.response) {
+            detailedError = `Status: ${error.response.status}\nData: ${JSON.stringify(error.response.data, null, 2)}`;
+        } else if (error.request) {
+            detailedError = "No response received from the server.";
+        } else {
+            detailedError = `Request error: ${error.message}`;
+        }
+        setErrorText(detailedError);
+        console.error('Error updating job:', error);
+    }
+};
+const handleDel = async (e) => {
+    e.preventDefault();
+    const jobIdNumber = parseInt(delId, 10);
+    if (isNaN(jobIdNumber)) {
+        setErrorText("Invalid Job ID. Please enter a valid numeric Job ID.");
+        return;
+    }
+
+    try {
+        const res = await axios.delete(`http://localhost:12345/jobs/${jobIdNumber}`, null, { timeout: 5000 });
+        console.log('Received response:', res.status);
+        setErrorText('');
+    } catch (error) {
+        setResponse(null);
+        let detailedError = "Error updating job";
+        if (error.response) {
+            detailedError = `Status: ${error.response.status}\nData: ${JSON.stringify(error.response.data, null, 2)}`;
+        } else if (error.request) {
+            detailedError = "No response received from the server.";
+        } else {
+            detailedError = `Request error: ${error.message}`;
+        }
+        setErrorText(detailedError);
+        console.error('Error updating job:', error);
+    }
+};
+
 
     return (
         <div className="job-submission-container">
@@ -98,7 +153,32 @@ ${JSON.stringify(requestBody, null, 2)}`;
                     className="input-field"
                 />
                 <br />
-                <button type="submit" className="submit-button">Submit</button>
+                <button type="submit" className="btn btn-success">POST</button>
+
+            </form>
+            <form onSubmit={handlePut}>
+                <br />
+                <input
+                    type="text"
+                    placeholder="Enter Job ID"
+                    value={jobId}
+                    onChange={(e) => setJobId(e.target.value)}
+                    className="input-field"
+                />
+                <br />
+                <button type="submit" className="btn btn-warning">PUT</button>
+            </form>
+             <form onSubmit={handleDel}>
+                <br />
+                <input
+                    type="text"
+                    placeholder="Enter Job ID"
+                    value={delId}
+                    onChange={(e) => setdelId(e.target.value)}
+                    className="input-field"
+                />
+                <br />
+                <button type="submit" className="btn btn-danger">DELETE</button>
             </form>
             {requestText && (
                 <div>

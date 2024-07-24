@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs};
+use std::fs;
 use serde_json;
 #[derive(Deserialize)]
 pub struct Server {

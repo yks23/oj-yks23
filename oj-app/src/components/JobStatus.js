@@ -4,6 +4,7 @@ import './JobStatus.css';
 import ModalImage from './ModalImage';
 import failedjpg from './th.jpg'
 import successjpg from './success.jpg'
+import 'bootstrap/dist/css/bootstrap.min.css';
 const JobStatus = () => {
     const [jobId, setJobId] = useState('');
     const [jobStatus, setJobStatus] = useState(null);
@@ -78,7 +79,7 @@ const JobStatus = () => {
                     onChange={(e) => setJobId(e.target.value)}
                     className="input-field"
                 />
-                <button onClick={fetchJobStatus} className="button">Check Status</button>
+                <button onClick={fetchJobStatus} className="btn btn-success">Check Status</button>
             </div>
             {jobStatus && (
                 <div className="job-details">
@@ -180,7 +181,7 @@ const JobStatus = () => {
                     onChange={handleInputChange}
                     className="input-field"
                 />
-                <button type="submit" className="button">Filter Jobs</button>
+                <button type="submit" className="bt btn btn-success">Filter Jobs</button>
             </form>
             {jobList.length > 0 && (
                 <div className="job-list">

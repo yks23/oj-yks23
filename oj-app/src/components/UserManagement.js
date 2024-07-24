@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './UserManagement.css';
-
+import 'bootstrap/dist/css/bootstrap.min.css';
 const UserManagement = () => {
     const [users, setUsers] = useState([]);
     const [name, setName] = useState('');
@@ -49,7 +49,7 @@ const UserManagement = () => {
                     onChange={(e) => setId(e.target.value)}
                     className="input-field"
                 />
-                <button onClick={registerUser} className="button">Register User</button>
+                <button onClick={registerUser} className="btn btn-success">Register User</button>
             </div>
             <h3 className="section-title">Registered Users</h3>
             <ul className="user-list">
