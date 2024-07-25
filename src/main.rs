@@ -68,7 +68,6 @@ async fn exit() -> impl Responder {
     log::info!("Shutdown as requested");
     save_users().expect("User save error");
     save_jobs().expect("Job save error");
-    jobs::remove_files_with_pattern("output*").await.unwrap();
     save_contests().expect("Contest save error");
     std::process::exit(0);
     format!("Exited")

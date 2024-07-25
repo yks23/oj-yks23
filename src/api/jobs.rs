@@ -459,7 +459,9 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 job.result = "Accepted".to_string();
             }
         }
-
+        remove_files_with_pattern(format!("output_{}*",job.id).as_str()).await.unwrap();
+        remove_files_with_pattern(&exe_file).await.unwrap();
+        remove_files_with_pattern(&filename).await.unwrap();
         job.update_score(&packing);
 
         // Update job in JOB_LIST
@@ -478,6 +480,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
 // Continuously process tasks in the queue
 pub async fn process_tasks(config: web::Data<Config>) {
     loop {
+         
         let job_ids: Vec<usize> = {
             let jobs = JOB_LIST.lock().unwrap();
             jobs.iter()
