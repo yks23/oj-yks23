@@ -7,13 +7,29 @@
 .section {
     margin-bottom: 40px;
 }
+.right-section {
+    margin-left: calc(100% / 3);
+}
 
 .section-title {
     text-align: center;
     font-size: 24px;
     margin-bottom: 20px;
+    color: white;
 }
-
+.right-section-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: white;
+    margin-left: calc(100% / 3);
+    text-align: center;
+}
+.Main-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: white;
+    margin-left: calc(185% / 3);
+}
 .input-field {
     width: 100%;
     padding: 10px;
@@ -66,34 +82,42 @@ tr:nth-child(even) {
     background-color: #f9f9f9;
 }
 /* Container for the navbar */
-.navbar-container {
+.sidebar-container {
     display: flex;
-    justify-content: center; /* Centers the navbar horizontally */
+    flex-direction: column; /* Change the flex direction to column */
+    justify-content: center; /* Centers the navbar vertically */
+    align-items: flex-start; /* Aligns the navbar to the left */
     padding: 10px; /* Adds some padding around the navbar */
-    background-color: #f8f8f8; /* Background color for the container */
-    border: 1px solid #ccc; /* Border for the container */
+    background-color: #13057a; /* Background color for the container */
+    border: 1px solid #0d0b8a; /* Border for the container */
     border-radius: 5px; /* Rounded corners for the container */
+    width: 25%; /* Set the width to 25% of the page */
+    height: 100vh; /* Set the height to the full vertical height of the page */
+    position: fixed; /* Fix the position of the container */
+    left: 0; /* Position the container to the left */
+    top: 0; /* Position the container to the top */
 }
 
 /* Navbar itself */
-.navbar {
+.sidebar {
     display: flex;
-    justify-content: space-around; /* Distributes items evenly */
+    flex-direction: column; /* Change the flex direction to column */
+    justify-content: center; /* Centers the links vertically */
+    align-items: center; /* Centers the links horizontally */
     width: 100%;
     max-width: 800px; /* Maximum width for the navbar */
 }
-
 /* Individual links */
-.navbar a {
+.sidebar a {
     text-decoration: none; /* Removes underline from links */
     padding: 10px 20px; /* Adds padding to the links */
-    color: #333; /* Text color for the links */
+    color: #e4d9e9; /* Text color for the links */
     border-radius: 5px; /* Rounded corners for the links */
     transition: background-color 0.3s; /* Smooth transition for background color */
 }
 
 /* Hover effect for links */
-.navbar a:hover {
+.sidebar a:hover {
     background-color: #ddd; /* Background color on hover */
 }
 

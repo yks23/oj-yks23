@@ -13,9 +13,9 @@ const App = () => {
         <body className='bg-dark'>
         <Router>
             <div className="app-container bg-dark">
-                <h1 className="section-title">OJ System</h1>
-                <nav className="navbar-container">
-                    <div className='navbar'>
+                <h1 className="Main-title">OJ System</h1>
+                <nav className="sidebar-container">
+                    <div className='sidebar'>
                     <Link to="/submit-job" className="nav-link">Submit Job</Link>
                     <Link to="/job-status" className="nav-link">Check Job Status</Link>
                     <Link to="/ranklist" className="nav-link">View Contest Ranklist</Link>
@@ -28,7 +28,7 @@ const App = () => {
                     <Route path="/job-status" element={<JobStatusPage />} />
                     <Route path="/ranklist" element={<RanklistPage />} />
                     <Route path="/user-management" element={<UserManagement />} />
-                    <Route path="/exit" element={<div className="section button-container">
+                    <Route path="/exit" element={<div className="right-section button-container ">
                 <ExitButton /> 
             </div>} />
                     <Route path="/" element={<HomePage />} />
@@ -42,21 +42,27 @@ const App = () => {
 };
 
 const HomePage = () => (
-    <div className="section">
-        <h2 className="section-title">Welcome to KSOJ System</h2>
+    <div className="right-section">
+        <h2 className="right-section-title">Welcome to KSOJ System</h2>
         <p>Please select an option from the navigation menu.</p>
     </div>
 );
 
 const JobSubmissionPage = () => (
-    <div className="section">
-        <JobSubmission />
+    <div>
+        <h2 className="right-section-title">Submit Job</h2>
+        <div className="right-section">
+            <JobSubmission />
+        </div>
     </div>
 );
 
 const JobStatusPage = () => (
-    <div className="section">
+    <div>
+        <h2 className="right-section-title">Check Job Status</h2>
+    <div className="right-section">
         <JobStatus />
+    </div>
     </div>
 );
 
@@ -67,9 +73,10 @@ const RanklistPage = () => {
         setContestId(e.target.value);
     };
 
-    return (
-        <div className="section">
-            <h2 className="section-title">View Contest Ranklist</h2>
+    return (<div>
+        <h2 className="right-section-title">View Contest Ranklist</h2>
+        <div className="right-section">
+            
             <input
                 type="text"
                 placeholder="Enter contest ID"
@@ -78,6 +85,7 @@ const RanklistPage = () => {
                 className="input-field"
             />
             {contestId && <Ranklist contestId={contestId} />}
+        </div>
         </div>
     );
 };

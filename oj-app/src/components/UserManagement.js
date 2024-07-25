@@ -33,9 +33,10 @@ const UserManagement = () => {
         }
     };
 
-    return (
-        <div className="user-management">
-            <h2 className="section-title">User Management</h2>
+    return (<div>
+        <h2 className="right-section-title">User Management</h2>
+        <div className="right-section">
+            
             <div className="form-group">
                 <input
                     type="text"
@@ -61,6 +62,7 @@ const UserManagement = () => {
                     </li>
                 ))}
             </ul>
+        </div>
         </div>
     );
 };

@@ -13,6 +13,17 @@
     margin-bottom: 20px;
 }
 
+.right-section {
+    margin-left: calc(100% / 3);
+}
+
+.right-section-title {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: white;
+    margin-left: calc(100% / 3);
+    text-align: center;
+}
 .form-group {
     display: flex;
     flex-direction: column;

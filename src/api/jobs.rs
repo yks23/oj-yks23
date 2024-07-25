@@ -152,7 +152,7 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
 }
 
 // Remove files matching a specific pattern
-async fn remove_files_with_pattern(pattern: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn remove_files_with_pattern(pattern: &str) -> Result<(), Box<dyn std::error::Error>> {
     for entry in glob(pattern)? {
         match entry {
             Ok(path) => match tokio::fs::remove_file(&path).await {
@@ -169,7 +169,7 @@ async fn remove_files_with_pattern(pattern: &str) -> Result<(), Box<dyn std::err
 }
 
 // Asynchronously read file contents
-async fn read_file_async(file_path: &str) -> std::io::Result<String> {
+pub async fn read_file_async(file_path: &str) -> std::io::Result<String> {
     let mut file = tokio::fs::File::open(file_path).await?;
     let mut contents = String::new();
     file.read_to_string(&mut contents).await?;
@@ -345,7 +345,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                                 .expect("Unable to read expected output file");
 
                             let output_stdout = String::from_utf8_lossy(&output.stdout);
-                            let output_file_path = format!("output_{}.txt", idx);
+                            let output_file_path = format!("output_{}_{}.txt",job.id,idx);
                             tokio::fs::write(&output_file_path, output_stdout.as_bytes())
                                 .await
                                 .unwrap();
