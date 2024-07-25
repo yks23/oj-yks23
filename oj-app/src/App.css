@@ -134,3 +134,7 @@ button {
     font-size: 16px;
     cursor: pointer;
 }
+.white-text {
+    text-align: center;
+    color: white;
+}

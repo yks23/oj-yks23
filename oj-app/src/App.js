@@ -43,8 +43,12 @@ const App = () => {
 
 const HomePage = () => (
     <div className="right-section">
-        <h2 className="right-section-title">Welcome to KSOJ System</h2>
-        <p>Please select an option from the navigation menu.</p>
+        <h2 className="section-title">Welcome to KSOJ System</h2>
+        <p className="white-text">
+            This is a simple online judge system.
+            It is created by YKS in July,2024.
+            </p>
+        <p className='white-text'>Please select an option from the navigation menu.</p>
     </div>
 );
 
