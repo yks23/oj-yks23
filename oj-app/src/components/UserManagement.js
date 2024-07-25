@@ -21,8 +21,10 @@ const UserManagement = () => {
     };
 
     const registerUser = async () => {
+        
         try {
             const user = id ? { id: parseInt(id, 10), name } : { name };
+            console.log(`{} {}`,id,name);
             const response = await axios.post('http://localhost:12345/users', user);
             alert(`User registered: ${JSON.stringify(response.data)}`);
             fetchUsers();

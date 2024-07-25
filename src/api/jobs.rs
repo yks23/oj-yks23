@@ -8,7 +8,9 @@ use chrono::DateTime;
 use chrono::Utc;
 use futures::future::join_all;
 use glob::glob;
+use std::clone;
 use std::process::Stdio;
+use std::thread::panicking;
 use std::time::Instant;
 use tokio::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -36,6 +38,7 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
     let users = USER_LIST.lock().unwrap();
     let now = Utc::now();
     let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+
     let mut jobstats = JobState::new();
     jobstats.created_time = created_time.clone();
     jobstats.updated_time = created_time.clone();
@@ -46,6 +49,8 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
     };
     jobstats.submission = job.clone();
     jobstats.score = 0.0;
+
+    // Setup job cases
     for p in &config.problems {
         if p.id as i32 == job.problem_id {
             jobstats.cases = p
@@ -69,21 +74,23 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
         }
     }
 
-    // Handle language validation
+    // Validate language
     let mut flag1: bool = false;
     for i in &config.languages {
         if *i.name == job.language {
             flag1 = true;
         }
     }
-    // Handle user validation
+
+    // Validate user
     let mut flag2: bool = false;
     for i in users.iter() {
         if i.id.unwrap() as i32 == job.user_id {
             flag2 = true;
         }
     }
-    // Handle contests validation
+
+    // Count the number of submissions for the contest
     let mut cnt_sub: u64 = 0;
     for i in jobs.iter() {
         if i.submission.user_id == job.user_id
@@ -97,6 +104,7 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
     let mut flag3: bool = false;
     let mut flag4: bool = false;
     let mut flag5: bool = true;
+
     {
         let contests = CONTEST_LIST.lock().unwrap();
         for i in contests.iter() {
@@ -118,24 +126,28 @@ async fn post_job(config: web::Data<Config>, new_job: web::Json<Job>) -> HttpRes
             }
         }
     }
+
     if !flag1 || !flag2 || !flag4 {
         return HttpResponse::NotFound().json(HTTPerror::new_none(3, "ERR_NOT_FOUND".to_string()));
     }
+
     if !flag3 {
         return HttpResponse::BadRequest()
             .json(HTTPerror::new_none(1, "ERR_INVALID_ARGUMENT".to_string()));
     }
+
     if !flag5 {
         return HttpResponse::BadRequest()
             .json(HTTPerror::new_none(4, "ERR_RATE_LIMIT".to_string()));
     }
+
     jobstats.state = "Queueing".to_string();
     jobstats.result = "Waiting".to_string();
     jobs.push(jobstats.clone());
+
     drop(jobs);
-    {
-        save_jobs().unwrap();
-    }
+    save_jobs().unwrap();
+
     HttpResponse::Ok().json(JobResponse::from_jobstate(&jobstats))
 }
 
@@ -163,6 +175,8 @@ async fn read_file_async(file_path: &str) -> std::io::Result<String> {
     file.read_to_string(&mut contents).await?;
     Ok(contents)
 }
+
+// Process a task with given job_id
 pub async fn process_task(config: web::Data<Config>, job_id: usize) {
     log::info!("Processing job {}", job_id);
 
@@ -186,6 +200,8 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
         let mut packing: Option<Vec<Vec<usize>>> = None;
         let mut special_judge: Option<Vec<String>> = None;
         let mut prom_type = "".to_string();
+
+        // Get problem and language configurations
         for i in &config.problems {
             if i.id == job.problem_id as u64 {
                 packing = i.misc.packing.clone();
@@ -193,14 +209,17 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 prom_type = i.problem_type.clone();
             }
         }
+
         for i in &config.languages {
             if i.name == now_job.language {
                 filename = i.file_name.clone();
                 commands = i.command.clone();
             }
         }
+
         let sourcecode = now_job.source_code.clone();
         remove_files_with_pattern("main*").await.unwrap();
+
         // Write code to temporary file
         let mut file = tokio::fs::File::create(filename.clone()).await.unwrap();
         file.write_all(sourcecode.as_bytes()).await.unwrap();
@@ -214,12 +233,16 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 _ => c.to_string(),
             })
             .collect();
+
         let exe_file = "main".to_string() + job.id.to_string().as_str();
         let child = Command::new(&commands[0])
             .args(compile_commands)
             .spawn()
             .unwrap();
+
         let output = child.wait_with_output().await.unwrap();
+
+        // Check if compilation was successful
         if !output.status.success() {
             job.state = "Finished".to_string();
             job.cases[0].1.result = "Compilation Error".to_string();
@@ -234,6 +257,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
             let now = Utc::now();
             let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
             job.updated_time = created_time;
+
             {
                 let mut jobs = JOB_LIST.lock().unwrap();
 
@@ -241,6 +265,7 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                     *existing_job = job.clone();
                 }
             }
+
             // Run every test case
             let mut skipped_point: Vec<usize> = Vec::new();
             for (idx, (case, pt)) in job.cases.iter_mut().enumerate() {
@@ -428,12 +453,15 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 }
                 save_jobs().unwrap();
             }
+
             job.state = "Finished".to_string();
             if job.result == "Running" {
                 job.result = "Accepted".to_string();
             }
         }
+
         job.update_score(&packing);
+
         // Update job in JOB_LIST
         {
             let mut jobs = JOB_LIST.lock().unwrap();
@@ -442,9 +470,12 @@ pub async fn process_task(config: web::Data<Config>, job_id: usize) {
                 *existing_job = job;
             }
         }
+
         save_jobs().unwrap();
     }
-} // Continuously process tasks in the queue
+} 
+
+// Continuously process tasks in the queue
 pub async fn process_tasks(config: web::Data<Config>) {
     loop {
         let job_ids: Vec<usize> = {
@@ -454,6 +485,7 @@ pub async fn process_tasks(config: web::Data<Config>) {
                 .map(|job| job.id as usize)
                 .collect()
         };
+
         let mut tasks = vec![];
 
         for job_id in job_ids {
@@ -462,6 +494,7 @@ pub async fn process_tasks(config: web::Data<Config>) {
                 process_task(config_clone, job_id).await;
             }));
         }
+
         let _ = join_all(tasks).await;
     }
 }
@@ -471,6 +504,7 @@ async fn get_job_by_id(id: web::Path<u64>) -> HttpResponse {
     log::info!("ask for job {}", id);
     let jobs = JOB_LIST.lock().unwrap();
     let job = jobs.iter().find(|&job| job.id == *id);
+
     if let Some(jobn) = job {
         HttpResponse::Ok().json(JobResponse::from_jobstate(jobn))
     } else {
@@ -486,6 +520,7 @@ async fn get_job_by_id(id: web::Path<u64>) -> HttpResponse {
 async fn put_job_by_id(id: web::Path<u64>) -> HttpResponse {
     let mut flag: bool = false;
     log::info!("response to put_jobs");
+
     {
         let mut jobs = JOB_LIST.lock().unwrap();
 
@@ -505,28 +540,28 @@ async fn put_job_by_id(id: web::Path<u64>) -> HttpResponse {
                 let created_time = now.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
                 job.updated_time = created_time;
+
                 for (_, p) in job.cases.iter_mut() {
                     p.result = "Waiting".to_string();
-                    p.time=0;
-                    p.memory=0;
+                    p.time = 0;
                 }
+
                 flag = true;
                 let rep = JobResponse::from_jobstate(&job);
                 return HttpResponse::Ok().json(rep);
             }
         }
     }
+
     if !flag {
         return HttpResponse::NotFound().json(HTTPerror::new(
             3,
             "ERR_NOT_FOUND".to_string(),
-            format!("Job {} not found.", *id),
+            format!("Job {} not found", *id),
         ));
     }
-    {
-        save_jobs().unwrap();
-    }
 
+    save_jobs().unwrap();
     HttpResponse::Ok().finish()
 }
 
@@ -534,6 +569,7 @@ async fn put_job_by_id(id: web::Path<u64>) -> HttpResponse {
 async fn delete_job_by_id(id: web::Path<u64>) -> HttpResponse {
     log::info!("response to delete_job");
     let mut flag: bool = false;
+
     {
         let mut jobs = JOB_LIST.lock().unwrap();
         for (idx, job) in jobs.iter_mut().enumerate() {
@@ -544,14 +580,14 @@ async fn delete_job_by_id(id: web::Path<u64>) -> HttpResponse {
             }
         }
     }
-    {
-        save_jobs().unwrap();
-    }
+
+    save_jobs().unwrap();
+
     if !flag {
         return HttpResponse::NotFound().json(HTTPerror::new(
             3,
             "ERR_NOT_FOUND".to_string(),
-            format!("Job {} not found.", *id),
+            format!("Job {} not found", *id),
         ));
     } else {
         HttpResponse::Ok().finish()
